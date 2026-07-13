@@ -1,0 +1,529 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SelfEntity {
+  id                   String               @id @default(cuid())
+  companyName          String
+  registeredAddress    String
+  communicationAddress String?
+  phoneNumbers         String[]
+  einNumber            String
+  bankName             String
+  bankAccountNumber    String
+  routingNumber        String
+  bankAddress          String?
+  swiftCode            String?
+  iban                 String?
+  status               EntityStatus         @default(ACTIVE)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  auditLogs            AuditLog[]
+  clients              Client[]
+  consultants          Consultant[]
+  templates            ProjectTemplate[]
+  projects             Project[]
+  salespeople          Salesperson[]
+  userRoles            UserSelfEntityRole[]
+  vendors              Vendor[]
+
+  @@map("self_entities")
+}
+
+model User {
+  id                 String                 @id @default(cuid())
+  email              String                 @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  isActive           Boolean                @default(true)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  vendorId           String?
+  auditLogs          AuditLog[]
+  consultantDocs     ConsultantDocument[]
+  uploadedDocs       DocumentVersion[]
+  notifications      Notification[]
+  statusChanges      ProjectStatusHistory[]
+  refreshTokens      RefreshToken[]
+  approvedTimesheets Timesheet[]            @relation("TimesheetApprover")
+  entityRoles        UserSelfEntityRole[]
+  vendor             Vendor?                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model UserSelfEntityRole {
+  id           String     @id @default(cuid())
+  userId       String
+  selfEntityId String
+  role         UserRole
+  createdAt    DateTime   @default(now())
+  selfEntity   SelfEntity @relation(fields: [selfEntityId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, selfEntityId, role])
+  @@index([selfEntityId])
+  @@map("user_self_entity_roles")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Client {
+  id                   String       @id @default(cuid())
+  selfEntityId         String
+  legalName            String
+  shortName            String?
+  registeredAddress    String?
+  communicationAddress String?
+  contactNames         String[]
+  emailAddresses       String[]
+  phoneNumbers         String[]
+  status               EntityStatus @default(ACTIVE)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  selfEntity           SelfEntity   @relation(fields: [selfEntityId], references: [id], onDelete: Cascade)
+  projects             Project[]
+
+  @@index([selfEntityId])
+  @@index([selfEntityId, legalName])
+  @@map("clients")
+}
+
+model Vendor {
+  id                   String          @id @default(cuid())
+  selfEntityId         String
+  legalName            String
+  shortName            String?
+  registeredAddress    String?
+  communicationAddress String?
+  contactNames         String[]
+  emailAddresses       String[]
+  phoneNumbers         String[]
+  status               EntityStatus    @default(ACTIVE)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  email                String?         @unique
+  lastLogin            DateTime?
+  mobile               String?
+  passwordHash         String?
+  vendorName           String?
+  consultants          Consultant[]
+  downstreamProjects   Project[]       @relation("DownstreamVendor")
+  upstreamProjects     Project[]       @relation("UpstreamVendor")
+  users                User[]
+  invoices             VendorInvoice[]
+  selfEntity           SelfEntity      @relation(fields: [selfEntityId], references: [id], onDelete: Cascade)
+
+  @@index([selfEntityId])
+  @@index([selfEntityId, legalName])
+  @@map("vendors")
+}
+
+model Consultant {
+  id            String               @id @default(cuid())
+  selfEntityId  String
+  fullName      String
+  shortName     String?
+  visaStatus    String?
+  address       String?
+  personalEmail String?
+  mobileNumber  String?
+  status        EntityStatus         @default(ACTIVE)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  email         String?              @unique
+  lastLogin     DateTime?
+  passwordHash  String?
+  vendorId      String?
+  documents     ConsultantDocument[]
+  selfEntity    SelfEntity           @relation(fields: [selfEntityId], references: [id], onDelete: Cascade)
+  vendor        Vendor?              @relation(fields: [vendorId], references: [id])
+  projects      Project[]
+  timesheets    Timesheet[]
+
+  @@index([selfEntityId])
+  @@index([selfEntityId, fullName])
+  @@map("consultants")
+}
+
+model Salesperson {
+  id              String               @id @default(cuid())
+  selfEntityId    String
+  fullName        String
+  shortName       String?
+  visaStatus      String?
+  address         String?
+  personalEmail   String?
+  mobileNumber    String?
+  status          EntityStatus         @default(ACTIVE)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  commissionRules CommissionRule[]
+  projectLinks    ProjectSalesperson[]
+  selfEntity      SelfEntity           @relation(fields: [selfEntityId], references: [id], onDelete: Cascade)
+
+  @@index([selfEntityId])
+  @@index([selfEntityId, fullName])
+  @@map("salespeople")
+}
+
+model Project {
+  id                 String                 @id @default(cuid())
+  selfEntityId       String
+  templateId         String?
+  name               String
+  clientId           String
+  consultantId       String
+  upstreamVendorId   String?
+  downstreamVendorId String?
+  status             ProjectStatus          @default(DRAFT)
+  startDate          DateTime?
+  invoiceSchedule    InvoiceSchedule        @default(MONTHLY)
+  paymentTerms       String?
+  paymentMode        PaymentMode            @default(ACH)
+  clientRatePerHour  Decimal                @db.Decimal(10, 2)
+  payRatePerHour     Decimal                @db.Decimal(10, 2)
+  payTarget          PayTarget              @default(CONSULTANT)
+  invoiceEmail       String?
+  currency           Currency               @default(USD)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  commissionRules    CommissionRule[]
+  invoices           Invoice[]
+  documents          ProjectDocument[]
+  salespeople        ProjectSalesperson[]
+  statusHistory      ProjectStatusHistory[]
+  client             Client                 @relation(fields: [clientId], references: [id])
+  consultant         Consultant             @relation(fields: [consultantId], references: [id])
+  downstreamVendor   Vendor?                @relation("DownstreamVendor", fields: [downstreamVendorId], references: [id])
+  selfEntity         SelfEntity             @relation(fields: [selfEntityId], references: [id], onDelete: Cascade)
+  template           ProjectTemplate?       @relation(fields: [templateId], references: [id])
+  upstreamVendor     Vendor?                @relation("UpstreamVendor", fields: [upstreamVendorId], references: [id])
+  timesheets         Timesheet[]
+  vendorInvoices     VendorInvoice[]
+
+  @@index([selfEntityId])
+  @@index([selfEntityId, status])
+  @@map("projects")
+}
+
+model ProjectSalesperson {
+  id            String      @id @default(cuid())
+  projectId     String
+  salespersonId String
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  salesperson   Salesperson @relation(fields: [salespersonId], references: [id])
+
+  @@unique([projectId, salespersonId])
+  @@map("project_salespeople")
+}
+
+model ProjectStatusHistory {
+  id         String         @id @default(cuid())
+  projectId  String
+  fromStatus ProjectStatus?
+  toStatus   ProjectStatus
+  changedBy  String
+  reason     String?
+  createdAt  DateTime       @default(now())
+  user       User           @relation(fields: [changedBy], references: [id])
+  project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_status_history")
+}
+
+model CommissionRule {
+  id            String         @id @default(cuid())
+  projectId     String
+  salespersonId String
+  type          CommissionType
+  currency      Currency       @default(USD)
+  amount        Decimal?       @db.Decimal(12, 2)
+  percent       Decimal?       @db.Decimal(5, 2)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  salesperson   Salesperson    @relation(fields: [salespersonId], references: [id])
+
+  @@index([projectId])
+  @@index([salespersonId])
+  @@map("commission_rules")
+}
+
+model ProjectDocument {
+  id           String            @id @default(cuid())
+  projectId    String
+  documentType DocumentType
+  title        String
+  isRequired   Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  versions     DocumentVersion[]
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_documents")
+}
+
+model DocumentVersion {
+  id           String          @id @default(cuid())
+  documentId   String
+  version      Int
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  s3Key        String
+  uploadedById String
+  createdAt    DateTime        @default(now())
+  document     ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy   User            @relation(fields: [uploadedById], references: [id])
+
+  @@unique([documentId, version])
+  @@map("document_versions")
+}
+
+model ProjectTemplate {
+  id                 String                      @id @default(cuid())
+  selfEntityId       String
+  name               String
+  description        String?
+  invoiceSchedule    InvoiceSchedule             @default(MONTHLY)
+  paymentTerms       String?
+  paymentMode        PaymentMode                 @default(ACH)
+  defaultClientRate  Decimal?                    @db.Decimal(10, 2)
+  defaultPayRate     Decimal?                    @db.Decimal(10, 2)
+  currency           Currency                    @default(USD)
+  markupTarget       Decimal?                    @db.Decimal(5, 2)
+  isActive           Boolean                     @default(true)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  selfEntity         SelfEntity                  @relation(fields: [selfEntityId], references: [id], onDelete: Cascade)
+  projects           Project[]
+  commissionDefaults TemplateCommissionDefault[]
+  requiredDocuments  TemplateRequiredDocument[]
+
+  @@index([selfEntityId])
+  @@map("project_templates")
+}
+
+model TemplateCommissionDefault {
+  id         String          @id @default(cuid())
+  templateId String
+  type       CommissionType
+  currency   Currency        @default(USD)
+  amount     Decimal?        @db.Decimal(12, 2)
+  percent    Decimal?        @db.Decimal(5, 2)
+  template   ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("template_commission_defaults")
+}
+
+model TemplateRequiredDocument {
+  id           String          @id @default(cuid())
+  templateId   String
+  documentType DocumentType
+  template     ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, documentType])
+  @@map("template_required_documents")
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  selfEntityId String?
+  userId       String?
+  action       String
+  resource     String
+  resourceId   String?
+  metadata     Json?
+  ipAddress    String?
+  createdAt    DateTime    @default(now())
+  selfEntity   SelfEntity? @relation(fields: [selfEntityId], references: [id])
+  user         User?       @relation(fields: [userId], references: [id])
+
+  @@index([selfEntityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Timesheet {
+  id              String         @id @default(cuid())
+  projectId       String
+  consultantId    String
+  hoursWorked     Decimal        @db.Decimal(6, 2)
+  weekEndingDate  DateTime
+  status          String         @default("DRAFT")
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  invoice         Invoice?
+  approver        User?          @relation("TimesheetApprover", fields: [approvedBy], references: [id])
+  consultant      Consultant     @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vendorInvoice   VendorInvoice?
+
+  @@index([projectId])
+  @@index([consultantId])
+  @@map("timesheets")
+}
+
+model Invoice {
+  id            String     @id @default(cuid())
+  projectId     String
+  timesheetId   String?    @unique
+  invoiceNumber String
+  amount        Decimal    @db.Decimal(12, 2)
+  currency      Currency   @default(USD)
+  issueDate     DateTime
+  dueDate       DateTime
+  status        String     @default("UNPAID")
+  paidAt        DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  timesheet     Timesheet? @relation(fields: [timesheetId], references: [id])
+
+  @@index([projectId])
+  @@map("invoices")
+}
+
+model ConsultantDocument {
+  id           String     @id @default(cuid())
+  consultantId String
+  documentType String
+  title        String
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  s3Key        String
+  uploadedById String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  consultant   Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  uploadedBy   User       @relation(fields: [uploadedById], references: [id])
+
+  @@index([consultantId])
+  @@map("consultant_documents")
+}
+
+model VendorInvoice {
+  id            String     @id @default(cuid())
+  vendorId      String
+  projectId     String
+  timesheetId   String?    @unique
+  invoiceNumber String
+  amount        Decimal    @db.Decimal(12, 2)
+  currency      Currency   @default(USD)
+  issueDate     DateTime
+  dueDate       DateTime
+  status        String     @default("UNPAID")
+  paidAt        DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  timesheet     Timesheet? @relation(fields: [timesheetId], references: [id])
+  vendor        Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([projectId])
+  @@map("vendor_invoices")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  title     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  PROJECT_MANAGER
+  SALESPERSON
+  VENDOR
+}
+
+enum EntityStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  TERMINATED
+  COMPLETED
+  ARCHIVED
+}
+
+enum CommissionType {
+  FLAT_ONE_TIME
+  MONTHLY
+  HOURLY
+  PERCENT_MARKUP
+}
+
+enum Currency {
+  USD
+  INR
+}
+
+enum PaymentMode {
+  ACH
+  WIRE
+  CHECK
+  ZELLE
+  OTHER
+}
+
+enum InvoiceSchedule {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum DocumentType {
+  CLIENT_MSA
+  CLIENT_SOW
+  CONSULTANT_NDA
+  CONSULTANT_OFFER_LETTER
+  VENDOR_CONTRACT
+  COMMISSION_AGREEMENT
+  MISCELLANEOUS
+}
+
+enum PayTarget {
+  CONSULTANT
+  DOWNSTREAM_VENDOR
+}
