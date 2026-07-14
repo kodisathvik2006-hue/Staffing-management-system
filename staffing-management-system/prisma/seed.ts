@@ -62,8 +62,6 @@ async function main() {
     data: {
       selfEntityId: entity.id,
       legalName: "TechCorp Inc",
-      firstName: "Jane",
-      lastName: "Client",
       contactNames: ["Jane Client"],
       emailAddresses: ["billing@techcorp.com"],
       phoneNumbers: ["+1-555-0101"],
@@ -87,8 +85,7 @@ async function main() {
     data: {
       selfEntityId: entity.id,
       vendorId: vendor.id,
-      firstName: "Raj",
-      lastName: "Kumar",
+      fullName: "Raj Kumar",
       visaStatus: "H1B",
       personalEmail: "raj.kumar@email.com",
       mobileNumber: "+1-555-0303",
@@ -101,8 +98,7 @@ async function main() {
   const salesperson = await prisma.salesperson.create({
     data: {
       selfEntityId: entity.id,
-      firstName: "Sarah",
-      lastName: "Sales",
+      fullName: "Sarah Sales",
       personalEmail: "sarah@staffing.com",
       mobileNumber: "+1-555-0404",
     },

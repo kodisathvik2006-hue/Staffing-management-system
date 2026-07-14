@@ -59,8 +59,7 @@ async function main() {
       await prisma.consultant.create({
         data: {
           selfEntityId: entity.id,
-          firstName: "Consultant",
-          lastName: email.split("@")[0],
+          fullName: "Consultant " + email.split("@")[0],
           email: email,
           passwordHash: await hashPassword("Consultant@12345"),
           status: "ACTIVE",
