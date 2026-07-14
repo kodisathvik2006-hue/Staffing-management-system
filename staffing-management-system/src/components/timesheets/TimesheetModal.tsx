@@ -62,7 +62,7 @@ export default function TimesheetModal({
                      Number(formData.thursdayHours) + Number(formData.fridayHours) + Number(formData.saturdayHours) + 
                      Number(formData.sundayHours)).toFixed(2);
 
-  const handleSubmit = async (status: "Draft" | "Pending") => {
+  const handleSubmit = async (status: "Draft" | "Pending Approval") => {
     setError("");
     if (!formData.projectId) return setError("Please select a project.");
     if (!formData.weekEndingDate) return setError("Please select a week ending date.");
@@ -228,7 +228,7 @@ export default function TimesheetModal({
           </button>
           <button 
             type="button"
-            onClick={() => handleSubmit("Pending Approval" as any)}
+            onClick={() => handleSubmit("Pending Approval")}
             disabled={loading || (initialData && initialData.status === "Pending Approval") || (initialData && initialData.status === "Approved")}
             className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium text-sm flex items-center gap-2"
           >

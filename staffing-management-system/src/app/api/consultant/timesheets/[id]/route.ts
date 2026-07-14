@@ -45,7 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (status === "Pending Approval" || status === "Pending") {
       await prisma.auditLog.create({
         data: {
-          selfEntityId: existing.project?.selfEntityId,
+          selfEntityId: updated.project?.selfEntityId,
           userId: session.sub,
           action: "Consultant Resubmitted",
           resource: "Timesheet",
